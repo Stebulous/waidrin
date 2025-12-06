@@ -26,7 +26,7 @@ export default function ActionEventView({ event, eventIndex, showControls = true
     })),
   );
 
-  const history = eventHistory?.[String(eventIndex)];
+  const history = eventIndex !== undefined && eventIndex >= 0 ? eventHistory?.[String(eventIndex)] : undefined;
   const hasMultipleVersions = history && history.entries.length > 1;
 
   const handleEdit = () => {

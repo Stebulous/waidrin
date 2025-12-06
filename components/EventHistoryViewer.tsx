@@ -33,7 +33,7 @@ export default function EventHistoryViewer({ eventIndex, onClose, onSelectVersio
     })),
   );
 
-  const history = eventHistory?.[String(eventIndex)];
+  const history = eventIndex !== undefined && eventIndex >= 0 ? eventHistory?.[String(eventIndex)] : undefined;
   const totalPages = getEventHistoryPageCount(eventIndex, pageSize);
   const pageEntries = getEventHistoryPage(eventIndex, page, pageSize);
 

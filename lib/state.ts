@@ -207,7 +207,7 @@ export function addEventHistoryVersion(eventIndex: number, newEvent: Event, type
       state.eventHistory = {};
     }
     if (!state.eventHistory[key]) {
-      // Initialize history with current event if it doesn't exist
+      // Initialize history with current event if it exists, otherwise with the new event
       const event = state.events[eventIndex];
       if (event) {
         state.eventHistory[key] = {
@@ -220,6 +220,21 @@ export function addEventHistoryVersion(eventIndex: number, newEvent: Event, type
           ],
           currentVersionIndex: 0,
         };
+      } else {
+        // Event doesn't exist, create history with the new event as the first entry
+        state.eventHistory[key] = {
+          entries: [
+            {
+              event: { ...newEvent },
+              timestamp: Date.now(),
+              type,
+            },
+          ],
+          currentVersionIndex: 0,
+        };
+        // Create the event in the events array
+        state.events[eventIndex] = newEvent;
+        return;
       }
     }
     const history = state.eventHistory[key];
