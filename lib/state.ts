@@ -240,7 +240,7 @@ export function addEventHistoryVersion(eventIndex: number, newEvent: Event, type
     const history = state.eventHistory[key];
     if (history) {
       history.entries.push({
-        event: newEvent,
+        event: { ...newEvent },
         timestamp: Date.now(),
         type,
       });
