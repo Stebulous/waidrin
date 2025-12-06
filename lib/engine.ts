@@ -288,3 +288,126 @@ export function abort(): void {
 export function isAbortError(error: unknown): boolean {
   return getBackend().isAbortError(error);
 }
+
+export async function regenerateNarration(
+  eventIndex: number,
+  onProgress?: (title: string, message: string, tokenCount: number) => void,
+): Promise<void> {
+  const backend = getBackend();
+
+  await getState().setAsync(async (state) => {
+    const event = state.events[eventIndex];
+    if (!event || event.type !== "narration") {
+      throw new Error("Event at index is not a narration event");
+    }
+
+    // Find the action that preceded this narration (if any)
+    let precedingAction: string | undefined;
+    for (let i = eventIndex - 1; i >= 0; i--) {
+      const prevEvent = state.events[i];
+      if (prevEvent.type === "action") {
+        precedingAction = prevEvent.action;
+        break;
+      } else if (prevEvent.type === "location_change" || prevEvent.type === "character_introduction") {
+      } else if (prevEvent.type === "narration") {
+        // Hit another narration, stop looking
+        break;
+      }
+    }
+
+    let step: [string, string] = ["Regenerating narration", ""];
+
+    const onToken = throttle(
+      (_token: string, count: number) => {
+        if (onProgress) {
+          onProgress(step[0], step[1], count);
+        }
+      },
+      state.updateInterval,
+      { leading: true, trailing: true },
+    );
+
+    const updateState = throttle(
+      () => {
+        getState().set(current(state));
+      },
+      state.updateInterval,
+      { leading: true, trailing: true },
+    );
+
+    try {
+      // Initialize history with current event if it doesn't exist
+      const key = String(eventIndex);
+      if (!state.eventHistory) {
+        state.eventHistory = {};
+      }
+      if (!state.eventHistory[key]) {
+        const currentEvent = state.events[eventIndex];
+        if (currentEvent) {
+          state.eventHistory[key] = {
+            entries: [
+              {
+                event: { ...currentEvent },
+                timestamp: Date.now(),
+                type: "regenerate",
+              },
+            ],
+            currentVersionIndex: 0,
+          };
+        }
+      }
+
+      // Start with empty text and update incrementally
+      const regeneratedEvent: NarrationEvent = {
+        type: "narration",
+        text: "",
+        locationIndex: event.locationIndex,
+        referencedCharacterIndices: [],
+      };
+
+      // Update the event in the array to show streaming
+      state.events[eventIndex] = regeneratedEvent;
+
+      // Regenerate the narration text
+      step = ["Regenerating narration", ""];
+      regeneratedEvent.text = await backend.getNarration(
+        narratePrompt(state, precedingAction),
+        (token: string, count: number) => {
+          regeneratedEvent.text += token;
+          onToken(token, count);
+          updateState();
+        },
+      );
+
+      // Extract referenced character indices
+      const referencedCharacterIndices = new Set<number>();
+      for (const match of regeneratedEvent.text.matchAll(/\*\*(.+?)(?:'s?)?\*\*/g)) {
+        const name = match[1];
+        for (const [index, character] of state.characters.entries()) {
+          if (character.name === name || character.name.split(" ")[0] === name) {
+            referencedCharacterIndices.add(index);
+            break;
+          }
+        }
+      }
+      regeneratedEvent.referencedCharacterIndices = Array.from(referencedCharacterIndices);
+
+      // Add to history
+      const history = state.eventHistory[key];
+      if (history) {
+        history.entries.push({
+          event: { ...regeneratedEvent },
+          timestamp: Date.now(),
+          type: "regenerate",
+        });
+        history.currentVersionIndex = history.entries.length - 1;
+      }
+
+      // Validate state
+      schemas.State.parse(state);
+    } finally {
+      onToken.cancel();
+      updateState.cancel();
+    }
+  });
+}
