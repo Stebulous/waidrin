@@ -3,16 +3,17 @@
 ## TL;DR
 - Next.js 15 app router frontend (`app/`, `components/`, `views/`) drives an async LLM-powered RPG engine living in `lib/`.
 - The story state machine in `lib/engine.ts` mutates a persisted Zustand store (`lib/state.ts`) and validates everything with shared zod schemas before/after every turn.
-- Run `npm install` then `npm run dev` and point the Connection step at an OpenAI-compatible server (e.g., `llama.cpp` HTTP server). Prod parity is `npm run build && npm run start`.
+- Always use Bun for dependency management and scripts (`bun install`, `bun run ...`); do not mix npm/pnpm/yarn in this repo.
+- Run `bun install` then `bun run dev` and point the Connection step at an OpenAI-compatible server (e.g., `llama.cpp` HTTP server). Prod parity is `bun run build && bun run start`.
 - Plugins load dynamically from `/plugins` (configurable via `PLUGINS_DIR`). Each manifest can ship custom settings, backends, and UI via the `Context` helper.
-- Keep AGPL headers, double quotes, Biome formatting, and run `npm run lint` (or `npx biome check`) before committing.
+- Keep AGPL headers, double quotes, Biome formatting, and run `bun run lint` (or `bunx biome check`) before committing.
 
 ## Environment & Tooling
-- Requirements: Node 20+, npm 10+, Git, a running OpenAI-compatible inference server. Default state points at `http://localhost:8080/v1/` with empty credentials.
-- Install deps once with `npm install`. Run `npm run dev` for Turbopack hot reload, or `npm run build && npm run start` to mimic production.
+- Requirements: Bun 1.1+ (script runner + package manager), Node 20+ (Next runtime), Git, a running OpenAI-compatible inference server. Default state points at `http://localhost:8080/v1/` with empty credentials.
+- Install deps once with `bun install`. Run `bun run dev` for Turbopack hot reload, or `bun run build && bun run start` to mimic production.
 - LLM configuration happens through the in-app Connection step (apiUrl, apiKey, model, context lengths, sampling params). Values persist in browser storage via Zustand; clear them via the Main Menu → Reset or `localStorage.removeItem("state")`.
 - Logs (`logPrompts`, `logParams`, `logResponses`) live inside the persisted state and are exposed via the State Debugger for ad-hoc tracing.
-- Tooling: Next.js + TypeScript, Radix UI, Tailwind (global styles only), Zustand+Immer, Biome for lint/format, and Next's built-in ESLint via `npm run lint`.
+- Tooling: Next.js + TypeScript, Radix UI, Tailwind (global styles only), Zustand+Immer, Biome for lint/format, and Next's built-in ESLint via `bun run lint`.
 
 ## Repo Tour
 - `app/`: App Router entry point (`page.tsx`) that orchestrates overlays, error handling, view switching, and plugin bootstrapping.
@@ -175,8 +176,8 @@ export class Context {
 
 ## Quality & Conventions
 - Always include the SPDX + copyright header at the top of TS/JS files.
-- Biome enforces double quotes, 120-char lines, and auto import organization. Run `npx biome check --apply` (or rely on editor integration) before sending patches.
-- `npm run lint` executes Next/ESLint; fix warnings before merging to keep CI green.
+- Biome enforces double quotes, 120-char lines, and auto import organization. Run `bunx biome check --apply` (or rely on editor integration) before sending patches.
+- `bun run lint` executes Next/ESLint; fix warnings before merging to keep CI green.
 - UI strings should remain human-friendly and accessible; rely on Radix primitives and keep imagery references in `public/images`.
 - Avoid mutating Zustand state directly—always go through `useStateStore` helpers so Immer can track drafts.
 
@@ -187,9 +188,9 @@ export class Context {
 - **Reset corrupted state:** Use Main Menu → Reset or clear the persisted `state` key in devtools, then reload the page to step through the wizard from scratch.
 
 ## Reference Commands
-- `npm run dev` — Next.js dev server with Turbopack + React Strict Mode.
-- `npm run build` — Production build (must succeed before PRs).
-- `npm run start` — Serve the production build.
-- `npm run lint` — Next/ESLint (uses project tsconfig).
-- `npx biome check --write .` — Optional formatter/linter pass matching repo defaults.
+- `bun run dev` — Next.js dev server with Turbopack + React Strict Mode.
+- `bun run build` — Production build (must succeed before PRs).
+- `bun run start` — Serve the production build.
+- `bun run lint` — Next/ESLint (uses project tsconfig).
+- `bunx biome check --write .` — Optional formatter/linter pass matching repo defaults.
 - `LLAMA_SERVER --host 0.0.0.0 --api-key XXX ...` — Ensure an OpenAI-compatible endpoint is alive before using the Connection step.
