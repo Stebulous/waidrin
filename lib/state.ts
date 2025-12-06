@@ -255,6 +255,9 @@ export function addEventHistoryVersion(eventIndex: number, newEvent: Event, type
  * Select a version from history to make it current
  */
 export function selectEventHistoryVersion(eventIndex: number, versionIndex: number): void {
+  if (eventIndex < 0) {
+    return;
+  }
   getState().set((state) => {
     const key = String(eventIndex);
     const history = state.eventHistory?.[key];
@@ -269,6 +272,9 @@ export function selectEventHistoryVersion(eventIndex: number, versionIndex: numb
  * Delete a version from history
  */
 export function deleteEventHistoryVersion(eventIndex: number, versionIndex: number): void {
+  if (eventIndex < 0) {
+    return;
+  }
   getState().set((state) => {
     const key = String(eventIndex);
     const history = state.eventHistory?.[key];
