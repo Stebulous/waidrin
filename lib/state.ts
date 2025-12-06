@@ -24,6 +24,8 @@ export type NarrationEvent = z.infer<typeof schemas.NarrationEvent>;
 export type CharacterIntroductionEvent = z.infer<typeof schemas.CharacterIntroductionEvent>;
 export type LocationChangeEvent = z.infer<typeof schemas.LocationChangeEvent>;
 export type Event = z.infer<typeof schemas.Event>;
+export type EventHistoryEntry = z.infer<typeof schemas.EventHistoryEntry>;
+export type EventHistory = z.infer<typeof schemas.EventHistory>;
 export type State = z.infer<typeof schemas.State>;
 
 export const initialState: State = schemas.State.parse({
@@ -66,6 +68,8 @@ export const initialState: State = schemas.State.parse({
   violentContentLevel: "regular",
   events: [],
   actions: [],
+  eventHistory: {},
+  historyPagination: undefined,
 });
 
 export type Plugin = Partial<{
@@ -158,4 +162,236 @@ export const useStateStore = create<StoredState>()(
 
 export function getState(): StoredState {
   return useStateStore.getState();
+}
+
+/**
+ * Initialize history for an event if it doesn't exist
+ */
+export function ensureEventHistory(eventIndex: number): void {
+  if (eventIndex < 0) {
+    return;
+  }
+  getState().set((state) => {
+    const key = String(eventIndex);
+    if (!state.eventHistory) {
+      state.eventHistory = {};
+    }
+    if (!state.eventHistory[key]) {
+      const event = state.events[eventIndex];
+      if (event) {
+        state.eventHistory[key] = {
+          entries: [
+            {
+              event: { ...event },
+              timestamp: Date.now(),
+              type: event.type === "action" ? "edit" : "regenerate",
+            },
+          ],
+          currentVersionIndex: 0,
+        };
+      }
+    }
+  });
+}
+
+/**
+ * Add a new version to an event's history
+ */
+export function addEventHistoryVersion(eventIndex: number, newEvent: Event, type: "edit" | "regenerate"): void {
+  if (eventIndex < 0) {
+    return;
+  }
+  getState().set((state) => {
+    const key = String(eventIndex);
+    if (!state.eventHistory) {
+      state.eventHistory = {};
+    }
+    if (!state.eventHistory[key]) {
+      // Initialize history with current event if it exists, otherwise with the new event
+      const event = state.events[eventIndex];
+      if (event) {
+        state.eventHistory[key] = {
+          entries: [
+            {
+              event: { ...event },
+              timestamp: Date.now(),
+              type: event.type === "action" ? "edit" : "regenerate",
+            },
+          ],
+          currentVersionIndex: 0,
+        };
+      } else {
+        // Event doesn't exist, create history with the new event as the first entry
+        state.eventHistory[key] = {
+          entries: [
+            {
+              event: { ...newEvent },
+              timestamp: Date.now(),
+              type,
+            },
+          ],
+          currentVersionIndex: 0,
+        };
+        // Create the event in the events array
+        state.events[eventIndex] = newEvent;
+        return;
+      }
+    }
+    const history = state.eventHistory[key];
+    if (history) {
+      history.entries.push({
+        event: { ...newEvent },
+        timestamp: Date.now(),
+        type,
+      });
+      history.currentVersionIndex = history.entries.length - 1;
+      // Update the actual event in the events array
+      state.events[eventIndex] = newEvent;
+    }
+  });
+}
+
+/**
+ * Select a version from history to make it current
+ */
+export function selectEventHistoryVersion(eventIndex: number, versionIndex: number): void {
+  if (eventIndex < 0) {
+    return;
+  }
+  getState().set((state) => {
+    const key = String(eventIndex);
+    const history = state.eventHistory?.[key];
+    if (history && versionIndex >= 0 && versionIndex < history.entries.length) {
+      history.currentVersionIndex = versionIndex;
+      state.events[eventIndex] = history.entries[versionIndex].event;
+    }
+  });
+}
+
+/**
+ * Delete a version from history
+ */
+export function deleteEventHistoryVersion(eventIndex: number, versionIndex: number): void {
+  if (eventIndex < 0) {
+    return;
+  }
+  getState().set((state) => {
+    const key = String(eventIndex);
+    const history = state.eventHistory?.[key];
+    if (!history || versionIndex < 0 || versionIndex >= history.entries.length) {
+      return;
+    }
+
+    // Don't allow deleting the last version
+    if (history.entries.length <= 1) {
+      return;
+    }
+
+    const wasCurrent = history.currentVersionIndex === versionIndex;
+    const wasBeforeCurrent = versionIndex < history.currentVersionIndex;
+
+    // Remove the entry
+    history.entries.splice(versionIndex, 1);
+
+    // Adjust currentVersionIndex if needed
+    if (wasCurrent) {
+      // If we deleted the current version, set to the previous one (or 0 if it was the first)
+      history.currentVersionIndex = Math.max(0, versionIndex - 1);
+      // Update the actual event in the events array
+      state.events[eventIndex] = history.entries[history.currentVersionIndex].event;
+    } else if (wasBeforeCurrent) {
+      // If we deleted a version before the current one, decrement the index
+      history.currentVersionIndex -= 1;
+    }
+    // If we deleted a version after the current one, no adjustment needed
+  });
+}
+
+/**
+ * Get paginated history entries for an event
+ */
+export function getEventHistoryPage(eventIndex: number, page: number, pageSize: number = 5): EventHistoryEntry[] {
+  const state = getState();
+  const key = String(eventIndex);
+  const history = state.eventHistory?.[key];
+  if (!history) {
+    return [];
+  }
+  const start = page * pageSize;
+  const end = start + pageSize;
+  return history.entries.slice(start, end);
+}
+
+/**
+ * Get total number of pages for an event's history
+ */
+export function getEventHistoryPageCount(eventIndex: number, pageSize: number = 5): number {
+  const state = getState();
+  const key = String(eventIndex);
+  const history = state.eventHistory?.[key];
+  if (!history) {
+    return 0;
+  }
+  return Math.ceil(history.entries.length / pageSize);
+}
+
+/**
+ * Set pagination state for history viewing
+ */
+export function setHistoryPagination(eventIndex: number, page: number, pageSize: number = 5): void {
+  getState().set((state) => {
+    state.historyPagination = {
+      eventIndex,
+      page,
+      pageSize,
+    };
+  });
+}
+
+/**
+ * Clear pagination state
+ */
+export function clearHistoryPagination(): void {
+  getState().set((state) => {
+    state.historyPagination = undefined;
+  });
+}
+
+/**
+ * Delete an event from the events array. History is preserved but the event is removed.
+ */
+export function deleteEvent(eventIndex: number): void {
+  if (eventIndex < 0) {
+    return;
+  }
+  getState().set((state) => {
+    // Delete the event from the array
+    state.events.splice(eventIndex, 1);
+
+    // Clean up history if it exists
+    const key = String(eventIndex);
+    if (state.eventHistory?.[key]) {
+      delete state.eventHistory[key];
+    }
+
+    // Adjust event indices in history for events after the deleted one
+    // Since we're deleting from the array, all subsequent events shift down by 1
+    if (state.eventHistory) {
+      const newHistory: typeof state.eventHistory = {};
+      for (const [histKey, histValue] of Object.entries(state.eventHistory)) {
+        const histIndex = Number.parseInt(histKey, 10);
+        if (!Number.isNaN(histIndex)) {
+          if (histIndex > eventIndex) {
+            // Shift the key down by 1
+            newHistory[String(histIndex - 1)] = histValue;
+          } else if (histIndex < eventIndex) {
+            // Keep the same key
+            newHistory[histKey] = histValue;
+          }
+          // Skip the deleted event's history (histIndex === eventIndex)
+        }
+      }
+      state.eventHistory = newHistory;
+    }
+  });
 }

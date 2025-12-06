@@ -77,6 +77,17 @@ export const Event = z.discriminatedUnion("type", [
   LocationChangeEvent,
 ]);
 
+export const EventHistoryEntry = z.object({
+  event: Event,
+  timestamp: z.number(),
+  type: z.enum(["edit", "regenerate"]),
+});
+
+export const EventHistory = z.object({
+  entries: EventHistoryEntry.array(),
+  currentVersionIndex: z.int().min(0),
+});
+
 export const State = z.object({
   apiUrl: z.url(),
   apiKey: z.string().trim(),
@@ -102,4 +113,12 @@ export const State = z.object({
   violentContentLevel: ViolentContentLevel,
   events: Event.array(),
   actions: Action.array(),
+  eventHistory: z.record(z.string(), EventHistory).optional(),
+  historyPagination: z
+    .object({
+      eventIndex: z.int(),
+      page: z.int().min(0),
+      pageSize: z.int().min(1),
+    })
+    .optional(),
 });

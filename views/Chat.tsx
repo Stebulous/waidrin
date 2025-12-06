@@ -87,7 +87,7 @@ export default function Chat() {
           <Flex direction="column">
             {events.map((event, index) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: Events are append-only, so this is valid.
-              <EventView key={index} event={event} />
+              <EventView key={index} event={event} eventIndex={index} />
             ))}
           </Flex>
         </ScrollArea>

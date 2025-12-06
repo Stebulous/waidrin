@@ -1,19 +1,35 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2025  Philipp Emanuel Weidmann <pew@worldwidemann.com>
 
-import { Box, HoverCard, Link, Text } from "@radix-ui/themes";
-import { useCallback, useMemo } from "react";
+import { Box, Flex, HoverCard, IconButton, Link, Text } from "@radix-ui/themes";
+import { useCallback, useMemo, useState } from "react";
+import { MdDelete, MdHistory, MdRefresh } from "react-icons/md";
 import Markdown from "react-markdown";
 import { useShallow } from "zustand/shallow";
-import { type NarrationEvent, useStateStore } from "@/lib/state";
+import { isAbortError, regenerateNarration } from "@/lib/engine";
+import { deleteEvent, ensureEventHistory, type NarrationEvent, useStateStore } from "@/lib/state";
 import CharacterView from "./CharacterView";
+import EventHistoryViewer from "./EventHistoryViewer";
 
-export default function NarrationEventView({ event }: { event: NarrationEvent }) {
-  const { characters } = useStateStore(
+interface NarrationEventViewProps {
+  event: NarrationEvent;
+  eventIndex?: number;
+  showControls?: boolean;
+}
+
+export default function NarrationEventView({ event, eventIndex, showControls = true }: NarrationEventViewProps) {
+  const [showHistory, setShowHistory] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const { characters, eventHistory } = useStateStore(
     useShallow((state) => ({
       characters: state.characters,
+      eventHistory: state.eventHistory,
     })),
   );
+
+  const history = eventIndex !== undefined && eventIndex >= 0 ? eventHistory?.[String(eventIndex)] : undefined;
+  const hasMultipleVersions = history && history.entries.length > 1;
 
   // Hack to highlight dialogue in text:
   //
@@ -83,9 +99,80 @@ export default function NarrationEventView({ event }: { event: NarrationEvent })
     [NameView, DialogueView],
   );
 
+  const handleRegenerate = async () => {
+    if (isRegenerating || eventIndex === undefined || eventIndex < 0) {
+      return;
+    }
+    setIsRegenerating(true);
+    try {
+      ensureEventHistory(eventIndex);
+      await regenerateNarration(eventIndex, (_title, _message, _tokenCount) => {
+        // Progress is handled by ProcessingBar in Chat component
+      });
+    } catch (error) {
+      if (!isAbortError(error)) {
+        console.error("Failed to regenerate narration:", error);
+      }
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  const handleShowHistory = () => {
+    if (eventIndex !== undefined && eventIndex >= 0) {
+      ensureEventHistory(eventIndex);
+      setShowHistory(true);
+    }
+  };
+
+  const handleDelete = () => {
+    if (eventIndex !== undefined && eventIndex >= 0) {
+      deleteEvent(eventIndex);
+    }
+  };
+
   return (
-    <Box className="text-(length:--font-size-5) [&_p]:mb-[0.7em]" width="100%" p="6">
-      <Markdown components={components}>{markdown}</Markdown>
-    </Box>
+    <>
+      <Box
+        className="text-(length:--font-size-5) [&_p]:mb-[0.7em]"
+        width="100%"
+        p="6"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {showControls && eventIndex !== undefined && eventIndex >= 0 && isHovered && (
+          <Flex justify="end" gap="2" mb="2">
+            {hasMultipleVersions && (
+              <IconButton size="2" variant="ghost" color="gray" onClick={handleShowHistory} title="View history">
+                <MdHistory />
+              </IconButton>
+            )}
+            <IconButton
+              size="2"
+              variant="ghost"
+              color="gray"
+              onClick={handleRegenerate}
+              disabled={isRegenerating}
+              title="Regenerate"
+            >
+              <MdRefresh />
+            </IconButton>
+            <IconButton size="2" variant="ghost" color="red" onClick={handleDelete} title="Delete">
+              <MdDelete />
+            </IconButton>
+          </Flex>
+        )}
+        <Markdown components={components}>{markdown}</Markdown>
+      </Box>
+      {showHistory && eventIndex !== undefined && eventIndex >= 0 && (
+        <EventHistoryViewer
+          eventIndex={eventIndex}
+          onClose={() => setShowHistory(false)}
+          onSelectVersion={() => {
+            setShowHistory(false);
+          }}
+        />
+      )}
+    </>
   );
 }

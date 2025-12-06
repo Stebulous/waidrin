@@ -175,7 +175,6 @@ export class Context {
 - During story mode, use the debugger to inspect `events`, `locations`, and `actions` to ensure prompts or plugin hooks produce the expected structures.
 
 ## Quality & Conventions
-- Always include the SPDX + copyright header at the top of TS/JS files.
 - Biome enforces double quotes, 120-char lines, and auto import organization. Run `bunx biome check --apply` (or rely on editor integration) before sending patches.
 - `bun run lint` executes Next/ESLint; fix warnings before merging to keep CI green.
 - UI strings should remain human-friendly and accessible; rely on Radix primitives and keep imagery references in `public/images`.
