@@ -337,54 +337,40 @@ export function clearHistoryPagination(): void {
 }
 
 /**
- * Delete an event. If the event has history with other versions, restore the latest version.
- * Otherwise, delete the event entirely.
+ * Delete an event from the events array. History is preserved but the event is removed.
  */
 export function deleteEvent(eventIndex: number): void {
   if (eventIndex < 0) {
     return;
   }
   getState().set((state) => {
+    // Delete the event from the array
+    state.events.splice(eventIndex, 1);
+
+    // Clean up history if it exists
     const key = String(eventIndex);
-    const history = state.eventHistory?.[key];
+    if (state.eventHistory?.[key]) {
+      delete state.eventHistory[key];
+    }
 
-    // If history exists and has entries, restore the latest one
-    if (history && history.entries.length > 0) {
-      // Find the latest version (last entry in history)
-      const latestVersionIndex = history.entries.length - 1;
-      const latestEvent = history.entries[latestVersionIndex].event;
-
-      // Restore the latest version
-      state.events[eventIndex] = latestEvent;
-      history.currentVersionIndex = latestVersionIndex;
-    } else {
-      // No history or only one version, delete the event entirely
-      state.events.splice(eventIndex, 1);
-
-      // Clean up history if it exists
-      if (state.eventHistory?.[key]) {
-        delete state.eventHistory[key];
-      }
-
-      // Adjust event indices in history for events after the deleted one
-      // Since we're deleting from the array, all subsequent events shift down by 1
-      if (state.eventHistory) {
-        const newHistory: typeof state.eventHistory = {};
-        for (const [histKey, histValue] of Object.entries(state.eventHistory)) {
-          const histIndex = Number.parseInt(histKey, 10);
-          if (!Number.isNaN(histIndex)) {
-            if (histIndex > eventIndex) {
-              // Shift the key down by 1
-              newHistory[String(histIndex - 1)] = histValue;
-            } else if (histIndex < eventIndex) {
-              // Keep the same key
-              newHistory[histKey] = histValue;
-            }
-            // Skip the deleted event's history (histIndex === eventIndex)
+    // Adjust event indices in history for events after the deleted one
+    // Since we're deleting from the array, all subsequent events shift down by 1
+    if (state.eventHistory) {
+      const newHistory: typeof state.eventHistory = {};
+      for (const [histKey, histValue] of Object.entries(state.eventHistory)) {
+        const histIndex = Number.parseInt(histKey, 10);
+        if (!Number.isNaN(histIndex)) {
+          if (histIndex > eventIndex) {
+            // Shift the key down by 1
+            newHistory[String(histIndex - 1)] = histValue;
+          } else if (histIndex < eventIndex) {
+            // Keep the same key
+            newHistory[histKey] = histValue;
           }
+          // Skip the deleted event's history (histIndex === eventIndex)
         }
-        state.eventHistory = newHistory;
       }
+      state.eventHistory = newHistory;
     }
   });
 }
