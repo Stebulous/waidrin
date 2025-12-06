@@ -35,7 +35,7 @@ export default function ActionEventView({ event, eventIndex, showControls = true
   };
 
   const handleSave = () => {
-    if (editText.trim() && editText !== event.action && eventIndex !== undefined && eventIndex >= 0) {
+    if (editText.trim() && editText.trim() !== event.action && eventIndex !== undefined && eventIndex >= 0) {
       ensureEventHistory(eventIndex);
       const newEvent: ActionEvent = {
         type: "action",
