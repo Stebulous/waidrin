@@ -1,5 +1,21 @@
 ![Waidrin](/public/images/logo.png)
 
+## About This Fork
+
+This fork extends Waidrin with comprehensive event management features that give players greater control over their story experience:
+
+- **Event Editing**: Edit player actions (events) inline by hovering over any action message and clicking the edit button. Changes are saved immediately and tracked in version history.
+
+- **Message Regeneration**: Regenerate AI narration events to explore alternative story directions. Hover over any narration message and click the regenerate button to generate a new version while preserving the original in history.
+
+- **Event History Management**: Every edit and regeneration is tracked in a complete version history. View past versions of any event, restore previous versions, and delete specific versions from history. History is paginated for easy navigation through long version lists.
+
+- **Event Deletion**: Remove events entirely from the story. Deleting an event removes it from the narrative while properly maintaining event indices for remaining events.
+
+These features address common user requests mentioned in the original Waidrin welcome screen, providing the ability to edit messages, regenerate responses, and manage story history that was previously unavailable.
+
+---
+
 **Waidrin** is a purpose-built role-playing game engine powered by an LLM.
 It is designed around an asynchronous, fully typed, fully validating state machine
 that uses constrained generation based on JSON schemas to dynamically create
